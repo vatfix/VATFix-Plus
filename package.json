@@ -1,0 +1,22 @@
+{
+  "name": "vatfix-proxy",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.1574.0",
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "nodemailer": "^7.0.5",
+    "soap": "^0.43.0",
+    "stripe": "^12.18.0"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}

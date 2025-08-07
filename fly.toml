@@ -1,0 +1,36 @@
+# fly.toml — drop‑in replacement
+# No structural changes, only formatting cleaned up
+
+app = "vatfix-proxy"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[[services]]
+  internal_port = 3000
+  protocol = "tcp"
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+  [services.http_checks]
+    interval = 10000
+    method = "get"
+    path = "/"
+    protocol = "http"
+    timeout = 2000
+    tls_skip_verify = false
+
+  [services.concurrency]
+    type = "requests"
+    hard_limit = 500
+    soft_limit = 250
+
+  [services.tcp_checks]
+    interval = 10000
+    timeout = 2000

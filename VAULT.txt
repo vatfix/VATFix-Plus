@@ -1,0 +1,73 @@
+VAULT — VATFix Plus Internal Documentation
+
+Last updated: 2025-08-07
+Confidential — Do not distribute
+
+---
+
+## Project Codename
+
+**VATFix Plus**
+
+## Purpose
+
+Automated validation of EU VAT numbers via VIES. Offers cache-backed redundancy and Stripe-gated access control.
+
+## Core Modules
+
+* `server.mjs` — Express API entrypoint
+* `lookup.js` — Direct + cached VIES calls
+* `entitlement.js` — Stripe subscription enforcement
+* `meter.js` — S3-backed rate limiting
+* `webhook.js` — Stripe webhook for sync
+
+## Endpoints
+
+* `POST /vat/lookup`
+
+  * Auth: `x-api-key` + `x-customer-email`
+  * Body: `{ countryCode, vatNumber }`
+  * Returns: `VIES object` or error
+
+## Environment Variables
+
+* `API_KEY` — Required API key
+* `STRIPE_SECRET_KEY` — Used for entitlement checks
+* `VATFIX_PLUS` — Enables PLUS gating logic
+* `VATFIX_PRICE_IDS` — Comma-separated Stripe price IDs
+* `S3_BUCKET` — Bucket used for logs/cache/metering
+* `VATFIX_CACHE_TTL_MS` — Cache TTL for VIES responses (default: 12h)
+* `VATFIX_WINDOW_MS` — Rate limit window (default: 60s)
+* `VATFIX_RPS_LIMIT` — Requests per window (default: 60)
+
+## Infrastructure
+
+* **Hosting**: Fly.io
+* **Stripe**: Subscription-based access
+* **S3**: Used for logs, cache, rate limits
+
+## Compliance Notes
+
+* GDPR-compliant: logs rotate, no PII persistence
+* EU-only: VIES does not support non-EU VATs
+* All requests require explicit customer email and API key
+
+## Emergency Kill Switch
+
+To disable access:
+
+1. Set `VATFIX_PLUS=0`
+2. Remove API key
+3. Revoke Stripe price IDs
+
+## Notes
+
+* Logs are stored at: `s3://<bucket>/logs/`
+* Cached responses: `s3://<bucket>/cache/`
+* Rate metering: `s3://<bucket>/meter/`
+
+## See Also
+
+* README.md for public-facing docs
+* LICENSE.txt for usage permissions
+* INSTRUCTIONS.md for deployment guidance
