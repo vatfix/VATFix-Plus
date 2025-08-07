@@ -22,8 +22,8 @@ POST /vat/lookup
 
 ```json
 {
-  "countryCode": "IT",
-  "vatNumber": "12741660968"
+  "countryCode": "EU",
+  "vatNumber": "123456789"
 }
 ```
 
@@ -31,12 +31,12 @@ POST /vat/lookup
 
 ```json
 {
-  "countryCode": "IT",
-  "vatNumber": "12741660968",
+  "countryCode": "EU",
+  "vatNumber": "EU123456789",
   "requestDate": "2025-08-06",
   "valid": true,
-  "name": "KIASAT MIDIA",
-  "address": "LARGO DEI GELSOMINI 12\n20146 MILANO MI"
+  "name": "ACME CORP",
+  "address": "123 EU VAT STREET\n10000 EXAMPLE CITY"
 }
 ```
 
