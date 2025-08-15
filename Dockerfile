@@ -1,15 +1,40 @@
+# Dockerfile — VATFix Plus (TLS-clean, tini, conditional npm install)
 FROM node:20-slim
+
+# System deps for TLS + time + init
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates tzdata tini \
+ && rm -rf /var/lib/apt/lists/*
+
+ENV TZ=Europe/Rome \
+    NODE_ENV=production \
+    # Crash fast on unhandled promises so Fly restarts instead of wedging
+    NODE_OPTIONS=--unhandled-rejections=strict
 
 WORKDIR /app
 
-COPY . .
+# Install deps first for layer cache. Support both with/without lockfile.
+COPY package.json package-lock.json* ./
+RUN if [ -f package-lock.json ]; then \
+      npm ci --omit=dev --no-audit --no-fund; \
+    else \
+      npm i --omit=dev --no-audit --no-fund; \
+    fi \
+ && npm cache clean --force
 
-# DEBUG: Print contents of entitlement.js to confirm it's being used
-RUN echo "=== ENTITLEMENT.JS CONTENTS ===" && cat lib/entitlement.js
+# Copy source
+COPY server.mjs ./server.mjs
+COPY webhook.js ./webhook.js
+COPY lib ./lib
 
-RUN npm install --omit=dev
+# Drop privileges
+RUN useradd -m -u 10001 appuser \
+ && chown -R appuser:appuser /app
+USER appuser
 
-ENV PORT=3000
 EXPOSE 3000
 
-CMD ["node", "server.mjs"]
+# Use tini as PID1 for clean signals in Fly
+ENTRYPOINT ["/usr/bin/tini","--"]
+
+CMD ["node","server.mjs"]
