@@ -1,148 +1,144 @@
-# 📖 INSTRUCTIONS.md
+# 📟 VATFix Plus — INSTRUCTIONS.md
 
-This document outlines the full integration and deployment instructions for **VATFix Plus**, a silent shell for automated EU VAT number validation.
+This file is **internal-use only**. Do not include in public README or documentation.
 
 ---
 
-## 🔧 Setup
+## 🧱 STACK
 
-### Prerequisites
+* **Runtime**: Node.js (ESM modules)
+* **Server**: Express
+* **Infra**: Fly.io (global edge)
+* **Storage**: S3 (for validation logs)
+* **Billing**: Stripe (Checkout, Webhooks)
+* **Email**: ProtonMail + SimpleLogin SMTP aliases
 
-* Node.js 20+
-* A Fly.io account
-* AWS S3 bucket with credentials
-* Stripe account with PLUS product
+---
 
-### Clone the Repo
+## 🚀 DEPLOYMENT STEPS
+
+1. **Clone repo**
 
 ```bash
-git clone https://github.com/your-org/vatfix-plus.git
+git clone https://github.com/vatfix/vatfix-plus
 cd vatfix-plus
 ```
 
-### Environment Variables
-
-Create a `.env` file with the following content:
+2. **Set secrets**
 
 ```bash
-PORT=3000
-API_KEY=sk_...
-STRIPE_SECRET_KEY=sk_live_...
-S3_BUCKET=vatfix-logs
-VATFIX_PLUS=1
-VATFIX_CACHE_TTL_MS=43200000
-VATFIX_PRICE_IDS=price_1RpxXnLxlDpcd1R1baTsCsPZ,price_1RpxbaLxlDpcd1R1ydGR3ej6
+echo STRIPE_SECRET_KEY=sk_live_... >> .env
+echo AWS_ACCESS_KEY_ID=... >> .env
+...
 ```
 
----
-
-## 🚀 Deploying
-
-### Deploy with Fly.io
-
-```bash
-fly launch --copy-config --name vatfix-proxy
-fly deploy --app vatfix-proxy
-```
-
-### View Logs
-
-```bash
-fly logs -a vatfix-proxy
-```
-
----
-
-## 🔌 API Reference
-
-### Endpoint
-
-```
-POST /vat/lookup
-```
-
-### Headers
-
-* `x-api-key`: your API key *(required)*
-* `x-customer-email`: registered Stripe billing email *(required)*
-
-### Payload
-
-```json
-{
-  "countryCode": "DE",
-  "vatNumber": "01234567890"
-}
-```
-
-### Success Response
-
-```json
-{
-  "countryCode": "DE",
-  "vatNumber": "01234567890",
-  "requestDate": "2025-08-06",
-  "valid": true,
-  "name": "LEGAL ENTITY",
-  "address": "ADDRESS LINE 1\nCITY, COUNTRY"
-}
-```
-
----
-
-## 🪼 Error Codes
-
-| Code | Message                | Description                        |
-| ---- | ---------------------- | ---------------------------------- |
-| 401  | Invalid API key        | Invalid or missing API key         |
-| 401  | Missing customer email | No billing email header            |
-| 400  | Missing VAT data       | Empty `countryCode` or `vatNumber` |
-| 403  | Access denied          | No active PLUS Stripe subscription |
-| 429  | rate\_limit\_exceeded  | Exceeded per-key request limit     |
-| 502  | fallback\:unavailable  | VIES down, no cache fallback       |
-| 500  | validation\_failed     | Internal error                     |
-
----
-
-## 🔐 Compliance
-
-* GDPR-compliant, no PII stored long-term
-* All logs in private AWS S3
-* VIES WSDL endpoint: `https://ec.europa.eu/taxation_customs/vies`
-
----
-
-## 🚩 Exit Procedure
-
-1. Visit `https://vatfix.eu/kill` to disable endpoint
-2. Stripe SKU `vatfix_plus_001` archived
-3. S3 logs exported
-4. Domain cancelled via Njalla
-
----
-
-## 🧪 Local Testing
+3. **Install & run local**
 
 ```bash
 npm install
-npm run dev
+node server.mjs
 ```
 
-Curl test:
+4. **Deploy to Fly.io**
 
 ```bash
-curl -X POST http://localhost:3000/vat/lookup \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: sk_test_..." \
-  -H "x-customer-email: user@example.com" \
-  -d '{"countryCode":"IT","vatNumber":"01234567890"}'
+fly launch
+fly deploy
 ```
 
 ---
 
-## 📝 Notes
+## 📬 WEBHOOKS
 
-* No frontend, no dashboard
-* Works headlessly via HTTP
-* Fast deploy & teardown
-* Ideal for automation workflows
+Stripe sends checkout + subscription events to:
+
+```
+POST https://plus.vatfix.eu/webhook
+```
+
+Webhook secret is set as:
+
+```env
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+Event flow:
+
+* Create API key on `checkout.session.completed`
+* Set quota based on `price_id`
+* Track usage + rate limit via `meter.js`
+* Revoke key on cancellation
+
+---
+
+## 🔐 S3 LOGGING
+
+Each VAT lookup writes a log to S3 bucket:
+
+```
+/vatfix/{lookupId}.json
+```
+
+IAM user must have PutObject permission.
+
+---
+
+## 📈 API USAGE
+
+Every request:
+
+* Reads rate limits via `meter.js`
+* Logs the request (header + IP + result)
+* Responds with `X-Rate-Remaining` header
+
+---
+
+## 📡 STRIPE SETUP
+
+Create products & pricing in Stripe Dashboard.
+Example:
+
+* **Plus Plan** → `price_1NX...`
+
+These IDs are passed into:
+
+```env
+VATFIX_PRICE_IDS=price_1NXABC123,price_1NXDEF456
+```
+
+Only buyers with active Stripe subscription can use the API.
+
+---
+
+## 📤 SMTP SETUP
+
+Used for recovery + alerts.
+Set up SimpleLogin SMTP alias:
+
+```env
+MAIL_FROM=vault@vatfix.eu
+SMTP_USER='vault@vatfix.eu'
+SMTP_PASS='password'
+SMTP_HOST=smtp.simplelogin.io
+SMTP_PORT=587
+```
+
+---
+
+## 🧪 TEST URLS
+
+* [x] Live test: `https://plus.vatfix.eu/vat/lookup`
+* [x] Billing page: `https://plus.vatfix.eu/buy`
+* [x] Docs: `https://plus.vatfix.eu/plus`
+
+---
+
+## ✅ FINAL CHECK
+
+* [ ] Stripe webhook responds 200 OK
+* [ ] Lookup returns correct data
+* [ ] S3 logs appear with lookupId
+* [ ] Rate limits enforce per key
+* [ ] No `.env` or `.log` in repo
+
+Stay boring. Stay profitable.
