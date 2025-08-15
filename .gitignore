@@ -1,0 +1,38 @@
+# Environment & secrets
+.env
+.env.local
+.env.production
+
+# Sensitive variables (not in repo)
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_ID=
+STRIPE_WEBHOOK_SECRET=
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+S3_BUCKET=
+AWS_REGION=
+VATFIX_PRICE_IDS=
+MAIL_FROM=
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASS=
+
+# Node & build
+node_modules/
+dist/
+build/
+
+# Logs
+*.log
+
+# IDE/editor
+.vscode/
+.idea/
+.DS_Store
+
+# OS junk
+Thumbs.db
+
+# Fly.io config
+fly.toml
