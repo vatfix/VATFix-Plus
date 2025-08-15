@@ -1,73 +1,98 @@
-VAULT — VATFix Plus Internal Documentation
+# 🔐 VATFix VAULT
 
-Last updated: 2025-08-07
-Confidential — Do not distribute
+**Internal mechanics, trade secrets & integration tips for the elite. DO NOT PUBLICIZE.**
 
 ---
 
-## Project Codename
+## 🔑 API Keys & Billing
 
-**VATFix Plus**
+* **API keys** are minted post-purchase via Stripe.
+* Each key is bound to a `customer_email`.
+* Headers `x-api-key` and `x-customer-email` are **mandatory**.
+* Rate limits: **120 requests/min** per key. Spikes over limit = 429 response.
 
-## Purpose
+---
 
-Automated validation of EU VAT numbers via VIES. Offers cache-backed redundancy and Stripe-gated access control.
+## 🧠 Cache & Fallback
 
-## Core Modules
+* **Redis + S3 combo**:
 
-* `server.mjs` — Express API entrypoint
-* `lookup.js` — Direct + cached VIES calls
-* `entitlement.js` — Stripe subscription enforcement
-* `meter.js` — S3-backed rate limiting
-* `webhook.js` — Stripe webhook for sync
+  * Fast responses from in-memory Redis (TTL: 12h).
+  * Long-term logging in S3 bucket `vatfix-plus-logs`.
+* All successful lookups are cached by `countryCode` + `vatNumber`.
 
-## Endpoints
+---
 
-* `POST /vat/lookup`
+## 🌐 Fallback Logic
 
-  * Auth: `x-api-key` + `x-customer-email`
-  * Body: `{ countryCode, vatNumber }`
-  * Returns: `VIES object` or error
+* If VIES API is down:
 
-## Environment Variables
+  * Retry 3x across EU mirrors.
+  * On full failure: serve stale cache if <12h old.
+  * Else: return `valid: null` with error code `vies_unavailable`.
 
-* `API_KEY` — Required API key
-* `STRIPE_SECRET_KEY` — Used for entitlement checks
-* `VATFIX_PLUS` — Enables PLUS gating logic
-* `VATFIX_PRICE_IDS` — Comma-separated Stripe price IDs
-* `S3_BUCKET` — Bucket used for logs/cache/metering
-* `VATFIX_CACHE_TTL_MS` — Cache TTL for VIES responses (default: 12h)
-* `VATFIX_WINDOW_MS` — Rate limit window (default: 60s)
-* `VATFIX_RPS_LIMIT` — Requests per window (default: 60)
+---
 
-## Infrastructure
+## 🧩 Code Structure
 
-* **Hosting**: Fly.io
-* **Stripe**: Subscription-based access
-* **S3**: Used for logs, cache, rate limits
+* `server.mjs` – Express server
+* `validate.js` – Core VAT validation engine
+* `webhook.js` – Stripe billing sync & revocation
+* `meter.js` – Per-key throttling & quota
+* `entitlement.js` – Plan detection & access rules
+* `success.js` – Post-checkout handling
 
-## Compliance Notes
+---
 
-* GDPR-compliant: logs rotate, no PII persistence
-* EU-only: VIES does not support non-EU VATs
-* All requests require explicit customer email and API key
+## 📦 Deployments
 
-## Emergency Kill Switch
+**Hosted on:** Fly.io
 
-To disable access:
+* Auto-scale across EU edge regions
+* `fly.toml` handles regions, resources, env vars
+* Logs piped to `logs.vatfix.eu` via Loki/Grafana
 
-1. Set `VATFIX_PLUS=0`
-2. Remove API key
-3. Revoke Stripe price IDs
+---
 
-## Notes
+## 🧪 Test Scenarios
 
-* Logs are stored at: `s3://<bucket>/logs/`
-* Cached responses: `s3://<bucket>/cache/`
-* Rate metering: `s3://<bucket>/meter/`
+### 1. Valid EU VAT
 
-## See Also
+```json
+{"countryCode":"DE", "vatNumber":"123456789"}
+```
 
-* README.md for public-facing docs
-* LICENSE.txt for usage permissions
-* INSTRUCTIONS.md for deployment guidance
+Should return `valid: true` with name/address.
+
+### 2. Invalid VAT
+
+```json
+{"countryCode":"FR", "vatNumber":"FAKE000000"}
+```
+
+Should return `valid: false`.
+
+### 3. Rate Limit
+
+Flood single key > 120 RPM — expect HTTP 429.
+
+### 4. Missing headers
+
+Omit `x-api-key` — expect HTTP 401.
+
+---
+
+## 🤫 Secrets
+
+* Stripe secret: `STRIPE_SECRET` in Fly env
+* Webhook secret: `STRIPE_WEBHOOK_SECRET`
+* Vault secrets for Redis/S3/API proxy tokens set in `.env` (not committed)
+
+---
+
+## 🧭 Internal Docs
+
+* See `INSTRUCTIONS.md` for deployment
+* GitHub readme is customer-facing — keep this vault internal
+
+Stay secret. Stay sovereign. 🛡️
